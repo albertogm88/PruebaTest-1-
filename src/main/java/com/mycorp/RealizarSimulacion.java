@@ -581,11 +581,6 @@ public class RealizarSimulacion {
 		beneficiario.setNombre( oBeneficiario.getDatosPersonales().getNombre() );
 		final Producto[] productos = obtenerProductosAsegurado(oDatosAlta.getTitular().getProductosContratados(), oDatosPlan );
 		beneficiario.setListaProductos( productos );
-		/* @TODO NO BORRAR!!!
-		 * String tarjeta = oBeneficiario.getSNumTarjetaSanitas(); if( !StringUtils.isEmpty(
-		 * tarjeta ) ) { obtenerProcedencia(tarjeta, oBeneficiario.getDatosPersonales(),
-		 * beneficiario); }
-		 */
 		return beneficiario;
 	}
 
@@ -732,31 +727,6 @@ public class RealizarSimulacion {
         return coberturas.toArray( new Cobertura[ 0 ] );
     }
 
-    /*
-     * private Procedencia obtenerProcedencia( List<ProductoPolizas> lProductos ) { Procedencia
-     * procedencia = null; if (lProductos != null && !lProductos.isEmpty()){ procedencia = new
-     * Procedencia(); procedencia.setIdColectivo( ( ( ProductoPolizas )lProductos.get( 0 )
-     * ).getIdColectivo() ); procedencia.setIdPoliza( ( ( ProductoPolizas )lProductos.get( 0 )
-     * ).getIdPoliza().intValue() ); procedencia.setIdCompania( ( ( ProductoPolizas )lProductos.get(
-     * 0 ) ).getIdCompania() ); } return procedencia; } private void obtenerProcedencia(String
-     * tarjeta, DatosPersona datosPersonales,
-     * es.sanitas.seg.simulacionpoliza.services.api.simulacion.vo.Beneficiario beneficiario){
-     * IRecuperarDatosTarjetaDAO oRecuperarDatosTarj = new RecuperarDatosTarjetaDAO(); try {
-     * @SuppressWarnings( "unchecked" ) Map<String, Object> hmRetorno =
-     * oRecuperarDatosTarj.recuperar( tarjeta ); if( hmRetorno.get( Constantes.COD_CLIENTE ) != null
-     * ) { Procedencia datosProcedencia = new Procedencia(); beneficiario.setIdCliente(
-     * Integer.valueOf( String.valueOf( hmRetorno.get( Constantes.COD_CLIENTE ) ) ) ); PolizaBasico
-     * oPoliza = ( PolizaBasico )hmRetorno.get( Constantes.BEAN_POLIZA );
-     * datosProcedencia.setIdColectivo( Long.valueOf( oPoliza.getNumColectivo() ).intValue() );
-     * datosProcedencia.setIdPoliza( Long.valueOf( oPoliza.getNumPoliza() ).intValue() );
-     * datosProcedencia.setIdCompania( Long.valueOf( oPoliza.getCompania() ).intValue() );
-     * util.datos.Beneficiario benef = ( util.datos.Beneficiario )hmRetorno.get(
-     * Constantes.BENEFICIARIOS ); SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
-     * datosPersonales.setFNacimiento(sdf.format( benef.getFNacimiento() ) );
-     * datosPersonales.setGenSexo( benef.getIdSexo() ); beneficiario.setProcedencia(
-     * datosProcedencia ); } } catch( Exception e ) { LOG.warn(
-     * "No se ha podido recuperar los datos de la tarjeta " + tarjeta, e ); } }
-     */
     /**
      * Método que recibe una fecha en formato String. Si la fecha está en formato edad, lo
      * transforma a formato fecha.
