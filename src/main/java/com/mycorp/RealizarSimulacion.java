@@ -107,10 +107,8 @@ public class RealizarSimulacion {
             throws Exception, ExcepcionContratacion {
 
         final Map< String, Object > hmSimulacion = new HashMap< >();
-        @SuppressWarnings( "unchecked" ) final List< String > lExcepciones = ( List< String > )hmValores
-                .get( "EXCEPCIONES" );
-        final DatosContratacionPlan oDatosPlan = ( DatosContratacionPlan )hmValores
-                .get( StaticVarsContratacion.DATOS_PLAN );
+        @SuppressWarnings( "unchecked" ) final List< String > lExcepciones = ( List< String > )hmValores.get( "EXCEPCIONES" );
+        final DatosContratacionPlan oDatosPlan = ( DatosContratacionPlan )hmValores.get( StaticVarsContratacion.DATOS_PLAN );
 
         final List< Primas > primas = new ArrayList< >();
         final Double descuentosTotales[] = { 0.0, 0.0, 0.0, 0.0 };
@@ -121,64 +119,14 @@ public class RealizarSimulacion {
         final List< List< com.mycorp.soporte.Recibo > > recibos = new ArrayList< >();
         final List< String > errores = new ArrayList< >();
 
-        Set< FrecuenciaEnum > frecuenciasTarificar = EnumSet.noneOf( FrecuenciaEnum.class );
-        if( hmValores.containsKey( StaticVarsContratacion.FREC_MENSUAL ) ) {
-            frecuenciasTarificar.clear();
-            frecuenciasTarificar.add( FrecuenciaEnum.MENSUAL );
-        }
-        if( lBeneficiarios != null ) {
-            frecuenciasTarificar.clear();
-            frecuenciasTarificar
-                    .add( FrecuenciaEnum.obtenerFrecuencia( oDatosAlta.getGenFrecuenciaPago() ) );
-        }
-        if( frecuenciasTarificar.isEmpty() ) {
-            frecuenciasTarificar = EnumSet.allOf( FrecuenciaEnum.class );
-        }
+        Set<FrecuenciaEnum> frecuenciasTarificar = rellenarFrecuenciasTarificar(oDatosAlta, lBeneficiarios, hmValores);
 
-        final Collection< Callable< TarificacionPoliza > > solvers = new ArrayList< >(
-                0 );
-        for( final FrecuenciaEnum frecuencia : frecuenciasTarificar ) {
-            solvers.add( simularPolizaFrecuencia( hmValores, oDatosAlta, lProductos, lBeneficiarios,
-                    frecuencia ) );
-        }
-        final CompletionService< TarificacionPoliza > ecs = new ExecutorCompletionService< >(
-                pool );
-        int n = 0;
-        for( final Callable< TarificacionPoliza > s : solvers ) {
-            try {
-                ecs.submit( s );
-                n++;
-            } catch( final RuntimeException ree ) {
-                LOG.error( "RejectedExecutionException con el metodo " + s.toString(), ree );
-            }
-        }
-        final List< TarificacionPoliza > resultadoSimulaciones = new ArrayList< >();
-        final List< ExecutionException > resultadoExcepciones = new ArrayList< >();
-        for( int i = 0; i < n; ++i ) {
-            try {
-                final Future< TarificacionPoliza > future = ecs.poll( TIMEOUT, TimeUnit.SECONDS );
-                if( future != null ) {
-                    resultadoSimulaciones.add( future.get() );
-                } else {
-                    LOG.error(
-                            "La llamada asincrona al servicio de simulacion ha fallado por timeout" );
-                }
-            } catch( final InterruptedException e ) {
-                LOG.error( "InterruptedException", e );
-            } catch( final ExecutionException e ) {
-                LOG.error( "ExecutionException", e );
-                resultadoExcepciones.add( e );
-            }
-        }
-
-        if( !resultadoExcepciones.isEmpty() ) {
-            throw new ExcepcionContratacion(
-                    resultadoExcepciones.get( 0 ).getCause().getMessage() );
-        }
+        final Collection<Callable<TarificacionPoliza>> solvers = rellenarSolvers(oDatosAlta, lProductos, lBeneficiarios, hmValores, frecuenciasTarificar);
+        
+        final List<TarificacionPoliza> resultadoSimulaciones = devolverResultados(solvers);
 
         for( final FrecuenciaEnum frecuencia : frecuenciasTarificar ) {
-            final TarificacionPoliza retornoPoliza = IterableUtils.find( resultadoSimulaciones,
-                    new Predicate< TarificacionPoliza >() {
+            final TarificacionPoliza retornoPoliza = IterableUtils.find( resultadoSimulaciones, new Predicate< TarificacionPoliza >() {
 
                         @Override
                         public boolean evaluate( final TarificacionPoliza object ) {
@@ -198,14 +146,8 @@ public class RealizarSimulacion {
 
             int contadorBeneficiario = 0;
             double css = 0;
-            for( final TarifaBeneficiario tarifaBeneficiario : retorno.getTarifas()
-                    .getTarifaBeneficiarios() ) {
-                List< PrimasPorProducto > listaProductoPorAseg = new ArrayList< >();
-                if( primasDesglosadas.size() > contadorBeneficiario ) {
-                    listaProductoPorAseg = primasDesglosadas.get( contadorBeneficiario );
-                } else {
-                    primasDesglosadas.add( listaProductoPorAseg );
-                }
+            for( final TarifaBeneficiario tarifaBeneficiario : retorno.getTarifas().getTarifaBeneficiarios() ) {
+                List<PrimasPorProducto> listaProductoPorAseg = devolverListaProductoAsegurado(primasDesglosadas, contadorBeneficiario);
 
                 Primas primaAsegurado = new Primas();
                 if( primas.size() > contadorBeneficiario ) {
@@ -217,12 +159,9 @@ public class RealizarSimulacion {
                 int contadorProducto = 0;
                 for( final TarifaProducto tarifaProducto : tarifaBeneficiario.getTarifasProductos() ) {
 
-                    if( ( tarifaProducto.getIdProducto() != 389
-                            || !comprobarExcepcion( lExcepciones,
-                                    StaticVarsContratacion.PROMO_ECI_COLECTIVOS )
+                    if( ( tarifaProducto.getIdProducto() != 389 || !comprobarExcepcion( lExcepciones, StaticVarsContratacion.PROMO_ECI_COLECTIVOS )
                             || hayTarjetas( oDatosAlta ) ) && tarifaProducto.getIdProducto() != 670
-                            || !comprobarExcepcion( lExcepciones,
-                                    StaticVarsContratacion.PROMO_FARMACIA )
+                            || !comprobarExcepcion( lExcepciones, StaticVarsContratacion.PROMO_FARMACIA )
                             || hayTarjetas( oDatosAlta ) ) {
 
                         PrimasPorProducto oPrimasProducto = new PrimasPorProducto();
@@ -318,6 +257,82 @@ public class RealizarSimulacion {
         }
         return hmSimulacion;
     }
+
+	private List<PrimasPorProducto> devolverListaProductoAsegurado(
+			final List<List<PrimasPorProducto>> primasDesglosadas, int contadorBeneficiario) {
+		List< PrimasPorProducto > listaProductoPorAseg = new ArrayList< >();
+		if( primasDesglosadas.size() > contadorBeneficiario ) {
+		    listaProductoPorAseg = primasDesglosadas.get( contadorBeneficiario );
+		} else {
+		    primasDesglosadas.add( listaProductoPorAseg );
+		}
+		return listaProductoPorAseg;
+	}
+
+	private List<TarificacionPoliza> devolverResultados(final Collection<Callable<TarificacionPoliza>> solvers)
+			throws ExcepcionContratacion {
+		final CompletionService< TarificacionPoliza > ecs = new ExecutorCompletionService< >( pool );
+        int n = 0;
+        for( final Callable< TarificacionPoliza > s : solvers ) {
+            try {
+                ecs.submit( s );
+                n++;
+            } catch( final RuntimeException ree ) {
+                LOG.error( "RejectedExecutionException con el metodo " + s.toString(), ree );
+            }
+        }
+        final List< TarificacionPoliza > resultadoSimulaciones = new ArrayList< >();
+        final List< ExecutionException > resultadoExcepciones = new ArrayList< >();
+        for( int i = 0; i < n; ++i ) {
+            try {
+                final Future< TarificacionPoliza > future = ecs.poll( TIMEOUT, TimeUnit.SECONDS );
+                if( future != null ) {
+                    resultadoSimulaciones.add( future.get() );
+                } else {
+                    LOG.error(
+                            "La llamada asincrona al servicio de simulacion ha fallado por timeout" );
+                }
+            } catch( final InterruptedException e ) {
+                LOG.error( "InterruptedException", e );
+            } catch( final ExecutionException e ) {
+                LOG.error( "ExecutionException", e );
+                resultadoExcepciones.add( e );
+            }
+        }
+
+        if( !resultadoExcepciones.isEmpty() ) {
+            throw new ExcepcionContratacion( resultadoExcepciones.get( 0 ).getCause().getMessage() );
+        }
+		return resultadoSimulaciones;
+	}
+
+	private Collection<Callable<TarificacionPoliza>> rellenarSolvers(final DatosAlta oDatosAlta,
+			final List<ProductoPolizas> lProductos, final List<BeneficiarioPolizas> lBeneficiarios,
+			final Map<String, Object> hmValores, Set<FrecuenciaEnum> frecuenciasTarificar) {
+		
+		final Collection< Callable< TarificacionPoliza > > solvers = new ArrayList< >( 0 );
+        for( final FrecuenciaEnum frecuencia : frecuenciasTarificar ) {
+            solvers.add( simularPolizaFrecuencia( hmValores, oDatosAlta, lProductos, lBeneficiarios, frecuencia ) );
+        }
+		return solvers;
+	}
+
+	private Set<FrecuenciaEnum> rellenarFrecuenciasTarificar(final DatosAlta oDatosAlta,
+			final List<BeneficiarioPolizas> lBeneficiarios, final Map<String, Object> hmValores) {
+		Set< FrecuenciaEnum > frecuenciasTarificar = EnumSet.noneOf( FrecuenciaEnum.class );
+        if( hmValores.containsKey( StaticVarsContratacion.FREC_MENSUAL ) ) {
+            frecuenciasTarificar.clear();
+            frecuenciasTarificar.add( FrecuenciaEnum.MENSUAL );
+        }
+        if( lBeneficiarios != null ) {
+            frecuenciasTarificar.clear();
+            frecuenciasTarificar.add( FrecuenciaEnum.obtenerFrecuencia( oDatosAlta.getGenFrecuenciaPago() ) );
+        }
+        if( frecuenciasTarificar.isEmpty() ) {
+            frecuenciasTarificar = EnumSet.allOf( FrecuenciaEnum.class );
+        }
+		return frecuenciasTarificar;
+	}
 
     private Callable< TarificacionPoliza > simularPolizaFrecuencia(
             final Map< String, Object > hmValores, final DatosAlta oDatosAlta,

@@ -22,5 +22,8 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="rest_simulacionpoliza-2.15.0.jar"/>
+	<classpathentry kind="lib" path="scontratacion-1.19.0.jar"/>
+	<classpathentry kind="lib" path="ws_contratacion-1.2.28.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
